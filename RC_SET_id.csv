@@ -1,0 +1,30 @@
+SET number,Site,Relative Location,Treatment,Marsh Type,Feature,DATE of last OPUS or Laser leveling,Technique,Reference point,Orthometric Elevation NAVD88 G_12B (m)
+1,PI,upper,Sill,Fringing,Behind,9/20/2006,OPUS,Brass Marker,0.31
+2,PI,lower,Sill,Fringing,Behind,11/9/2006,Leveling,Brass Marker,-0.13
+3,PI,upper,Natural,Fringing,Oyster,4/5/2007,OPUS,Brass Marker,0.32
+4,PI,lower,Natural,Fringing,Oyster,11/9/2006,Leveling,Brass Marker,-0.06
+5,NCMM,upper,Natural,Fringing,None,4/6/2007,OPUS,Brass Marker,0.43
+6,NCMM,lower,Natural,Fringing,None,11/1/2006,Leveling,Brass Marker,-0.01
+7,NCMM,upper,Sill,Fringing,Behind,4/6/2007,OPUS,Brass Marker,0.52
+8,NCMM,lower,Sill,Fringing,Behind,11/1/2006,Leveling,Brass Marker,0.06
+9,PKS,upper,Sill,Fringing,Behind,11/3/2006,OPUS,Brass Marker,0.27
+10,PKS,lower,Sill,Fringing,Behind,11/3/2006,Leveling,Brass Marker,0.06
+11,CL,upper,Natural,Fringing,Oyster,4/17/2007,OPUS,Brass Marker,0.26
+12,PKS,upper,Natural,Fringing,None,4/17/2007,OPUS,Brass Marker,0.32
+13,PKS,lower,Natural,Fringing,None,11/3/2006,Leveling,Brass Marker,-0.14
+14,PKS,lower,Natural ,Non-Fringing,None,11/3/2006,Leveling,Brass Marker,0.04
+16,PKS,upper,Natural ,Non-Fringing,None,4/19/2007,OPUS,Brass Marker,0.26
+17,HI,lower,Sill,Fringing,Behind,11/5/2006,Leveling,Brass Marker,-0.01
+18,HI,upper,Sill,Fringing,Behind,4/13/2007,OPUS,Brass Marker,0.17
+19,HI,upper,Eroded,Short-Fringing,Eroded,4/25/2007,OPUS,Brass Marker,0.28
+20,HI,lower,Natural,Fringing,None,11/5/2006,Leveling,Brass Marker,-0.12
+21,HI,upper,Natural,Fringing,None,4/9/2007,OPUS,Brass Marker,0.27
+22,MM,lower,Natural ,Non-Fringing,Oyster,11/2/2006,Leveling,Brass Marker,-0.13
+23,MM,upper,Natural ,Non-Fringing,Oyster,10/4/2006,OPUS,Brass Marker,0.10
+24,MM,upper,Natural,Non-Fringing,None,10/4/2006,OPUS,Brass Marker,0.07
+25,MM,lower,Natural,Non-Fringing,None,11/2/2006,Leveling,Brass Marker,-0.25
+26,CL,lower,Natural,Fringing,Oyster,11/6/2006,Leveling,Brass Marker,-0.17
+27,CL,upper,Natural,Fringing,None,10/5/2006,OPUS,Brass Marker,0.48
+28,CL,lower,Natural,Fringing,None,11/6/2006,Leveling,Brass Marker,-0.30
+29,NPRT,lower,Natural,Fringing,None,6/11/2007,Leveling,Brass Marker,-0.43
+30,NRRT,upper,Natural,Fringing,None,3/9/2009,OPUS,Brass Marker,0.24
