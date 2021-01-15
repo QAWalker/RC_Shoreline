@@ -1,4 +1,4 @@
-source(paste0(getwd(), "/sppnames.R"))
+source(paste0(getwd(), "/helper scripts/sppnames.R"))
 
 speciesname <- function(sppabb){
   sppnames$sppname[sppnames$abb==sppabb]

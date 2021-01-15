@@ -1,6 +1,6 @@
 library(tidyverse)
 library(lubridate)
-source(paste0(getwd(), "/sppnames.R"))
+source(paste0(getwd(), "/helper scripts/sppnames.R"))
 
 cbPalette <- c("#E69F00", "#0072B2", "#009E73", "#D55E00", "#CC79A7", "#F0E442", "#56B4E9", "#999999")
 theme_set(theme_bw() + theme(legend.key = element_rect(color = "white")))
@@ -154,23 +154,39 @@ ggplot(elev.summary, aes(Date, y = elev.d.mean, color = as.factor(Treatment)))+
   geom_line()+
   geom_point(size = 3)+
   facet_wrap(Plot~., labeller = "label_both")+
-  labs(y = "Change in Elevation (m NAVD)", color = 'Treatment')
+  scale_color_manual(values = cbPalette[c(3,8)])+
+  labs(title = "Vegetation Plot Elevation Change", 
+       y = "Change in Mean Plot Elevation (m NAVD)\nMean ± SE", color = 'Treatment', x = NULL)
+ggsave(filename = paste0(getwd(), "/Figures/Plot Elevation/Mean Elevation Change.png"),
+       width = 9, height = 6, units = "in", dpi = 440)
 
 ggplot(elev.summary, aes(Date, y = elev.mean, color = as.factor(Treatment)))+
+  # geom_smooth(method = 'lm', se = F, aes(group = Treatment), color = "gray30") +
   geom_errorbar(aes(min = elev.mean - elev.se, max = elev.mean + elev.se), width = 90) +
   geom_line() +
   geom_point(size = 3) +
-  geom_smooth(method = 'lm', se = F, color = 'gray', aes(group = Treatment)) +
   facet_wrap(Plot~., labeller = "label_both") +
-  labs(y = "Elevation (m NAVD)", color = 'Treatment')
+  scale_color_manual(values = cbPalette[c(3,8)])+
+  labs(title = "Vegetation Plot Elevation",
+       y = "Plot Elevation (m NAVD)\nMean ± SE", color = 'Treatment', x = NULL)
+ggsave(filename = paste0(getwd(), "/Figures/Plot Elevation/Mean Elevation.png"),
+       width = 9, height = 6, units = "in", dpi = 440)
 
-ggplot(elev.summary.allyrs, aes(Date, y = elev.d.mean, group = paste(initial.year, Treatment), color = Treatment))+
+ggplot(elev.summary.allyrs, aes(Date, y = elev.d.mean, group = paste(initial.year, Treatment), color = Treatment, shape = factor(initial.year)))+
   geom_errorbar(aes(min = elev.d.mean - elev.d.se, max = elev.d.mean + elev.d.se), width = 90)+
   geom_line(size = 0.65)+
-  geom_point(size = 3)+
-  facet_grid(Plot~., labeller = "label_both")+
-  labs(y = "Change in Elevation (m NAVD)", color = 'Treatment')
-
+  geom_point(size = 3, aes(fill = Treatment), color = "black")+
+  scale_color_manual(values = cbPalette[c(3,8)])+
+  scale_fill_manual(values = cbPalette[c(3,8)])+
+  scale_shape_manual(values = c(21, 22, 23, 24, 25))+
+  facet_wrap(Plot~., labeller = "label_both")+
+  labs(title = "Vegetation Plot Elevation Change", 
+       y = "Change in Mean Plot Elevation (m NAVD)\nMean ± SE",
+       color = 'Treatment', x = NULL, shape = "Initial Survey Year")+
+  guides(color = guide_legend(override.aes = list(shape = 22, color = "black", size = 4, linetype = NA)),
+         shape = guide_legend(override.aes = list(color = "black", size = 4, fill = "black")))
+ggsave(filename = paste0(getwd(), "/Figures/Plot Elevation/Mean Elevation change by initial year.png"),
+       width = 9, height = 6, units = "in", dpi = 440)
 # for (yr in unique(year(elev$intial.date))) {
 #   ggplot(elev.summary.yr[[as.character(yr)]], aes(Date, y = elev.d.mean, color = as.factor(Treatment)))+
 #     geom_errorbar(aes(min = elev.d.mean - elev.d.se, max = elev.d.mean + elev.d.se), width = 90)+
@@ -303,7 +319,7 @@ ggplot(elev, aes(Corrected, fill = Treatment))+
   geom_histogram(binwidth = 0.05)+
   facet_grid(Plot~Treatment+Year)
 
-table(year(elev.initial$elev.initial.date))
+table(year(elev.initial$initial.date))
 
 ggplot(filter(elev.initial, ), aes(elev.initial, fill = as.factor(initial.year)))+
   geom_histogram(binwidth = .15)+
@@ -313,7 +329,7 @@ ggplot(filter(elev.initial, ), aes(elev.initial, fill = as.factor(initial.year))
        subtitle = "15 cm bins",
        x = "initial elevation (m NAVD88)", 
        fill = "Year of Initial Survey")
-ggsave(filename = paste0("R:/CEE/RC shoreline/Data/Vegetation Data/Graphs/Elevations/initial elevations 15 cm bins.png"),width = 5, height = 4, units = "in", dpi = 150)
+# ggsave(filename = paste0(getwd(), "/Figures/Plot Elevation/initial elevations 15 cm bins.png"),width = 5, height = 4, units = "in", dpi = 150)
 
 df <- left_join(VegData, elev.initial) 
 
@@ -343,8 +359,8 @@ ggplot(elev.initial, aes(as.factor(Plot), elev.initial))+
   labs(x = "Distance from Shoreline (m)", 
        title = "Initial Plot Elevation and Distance from Shoreline", 
        y = "Starting Elevation (m NAVD88)")
-ggsave(filename = paste0(getwd(), "/Figures/Plot Elevation/Plot Elevation by Distance from Shoreline boxplots with sites.png"),
-       width = 9, height = 6, units = "in", dpi = 330)
+# ggsave(filename = paste0(getwd(), "/Figures/Plot Elevation/Plot Elevation by Distance from Shoreline boxplots with sites.png"),
+#        width = 9, height = 6, units = "in", dpi = 330)
 
 ggplot(elev.initial, aes(as.factor(Plot), elev.initial))+
   geom_boxplot(aes(fill = Treatment))+
@@ -352,8 +368,8 @@ ggplot(elev.initial, aes(as.factor(Plot), elev.initial))+
   labs(x = "Distance from Shoreline (m)", 
        title = "Initial Plot Elevation and Distance from Shoreline", 
        y = "Starting Elevation (m NAVD88)")
-ggsave(filename = paste0(getwd(), "/Figures/Plot Elevation/Plot Elevation by Distance from Shoreline boxplots.png"),
-       width = 9, height = 6, units = "in", dpi = 330)
+# ggsave(filename = paste0(getwd(), "/Figures/Plot Elevation/Plot Elevation by Distance from Shoreline boxplots.png"),
+#        width = 9, height = 6, units = "in", dpi = 330)
 
 if(exists("summary.SETs")){
   SETs.initial <- summary.SETs %>% 
@@ -398,8 +414,8 @@ ggplot(elev.initial.withallsites, aes(as.factor(Plot), elev.initial))+
        title = "Initial Plot Elevation and Distance from Shoreline", 
        y = "Starting Elevation (m NAVD88)")
 
-ggsave(filename = paste0(getwd(),"/Figures/Plot Elevation/Plot Elevation by Distance from Shoreline boxplots with sites and all sites.png"),
-       width = 9, height = 6, units = "in", dpi = 330)
+# ggsave(filename = paste0(getwd(),"/Figures/Plot Elevation/Plot Elevation by Distance from Shoreline boxplots with sites and all sites.png"),
+#        width = 9, height = 6, units = "in", dpi = 330)
 
 ##spp = "Salt"
 for(spp in unlist(spplist)){#}

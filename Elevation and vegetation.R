@@ -4,7 +4,7 @@ df <- VegData.melt %>%
   left_join(elev,
             by = c("SampTime","Year", "Site", "Treatment", "Transect", "Plot")) %>% 
   filter(!is.na(Corrected))
-
+spp = "BMtotal"
 for(spp in unlist(spplist)){#}
   temp.df <- filter(df, 
                     variable == spp)
@@ -14,12 +14,23 @@ for(spp in unlist(spplist)){#}
   axisname = sppnames$axis.label[sppnames$abb==spp] 
   unit = sppnames$unit[sppnames$abb==spp][[1]]
   unitname = sppnames$unitname[sppnames$abb==spp]
-  suffix = "?? SE"
+  suffix = "± SE" #Alt+0177
   
-  ggplot(temp.df, aes(Corrected, value, color = as.factor(Year)))+
+  temp.df$Corrected2 <- temp.df$Corrected^2
+  quadmodel <- lm(value ~ Corrected + Corrected2, data = temp.df)
+  summary(quadmodel)
+  
+  cvalues <- seq(range(temp.df$Corrected)[1], range(temp.df$Corrected)[2], by = 0.1)
+  
+  pdct <- predict(quadmodel, list(Corrected=cvalues, Corrected2=cvalues^2))
+  plot(temp.df$Corrected, temp.df$value, pch = 16)
+  lines(cvalues, pdct, col = 'blue')
+  
+  ggplot(temp.df, aes(Corrected, value))+
+    geom_smooth(method = "lm", formula = y ~ poly(x, 2), se = F)+
     #geom_line(aes(group = Year))+
-    geom_point(size = 3, alpha = .75)+
-    facet_grid(Site~Treatment)+
+    geom_point(size = 3, alpha = .75, aes(color = as.factor(Site)))+
+    facet_grid(Plot~Treatment)+
     # scale_color_manual(values = cbPalette)+
     labs(y = bquote(.(axisname)~.(tolower(unitname))),
          x = "Plot Elevation (m NAVD88)",

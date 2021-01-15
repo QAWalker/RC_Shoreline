@@ -20,7 +20,7 @@ if(!exists("spplist")) {
 
 yearaxis <- function(s){paste0("'", substr(s, 3, 4))}
 
-source(paste0(getwd(), "/species name helper functions.R"))
+source(paste0(getwd(), "/helper scripts/species name helper functions.R"))
 
 capitalize <- function(y) {
   c <- strsplit(y, " ")[[1]]
