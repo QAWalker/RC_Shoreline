@@ -9,16 +9,15 @@ capitalize <- function(y) {
 }
 
 theme_set(theme_bw())
+ 
+SETids <- read_xlsx(paste0(getwd(), "/Data/RC_Shoreline_SET_Elevation_MSC.xlsx"), sheet = "SET IDs") %>%
+  rename(SET = 'SET number', Location = "Relative Location", VRP.elev = "Orthometric Elevation NAVD88 G_12B (m)", Marsh.Type = "Marsh Type") 
 
-SETids <- read.csv(paste0(getwd(), "/RC_SET_id.csv"), stringsAsFactors = F, strip.white = T) %>% 
-  rename(SET = SET.number, Location = Relative.Location, VRP.elev = Orthometric.Elevation.NAVD88.G_12B..m.) %>% 
-  select(-"DATE.of.last.OPUS.or.Laser.leveling", -"Technique", -"Reference.point")
-
-SET <- read.csv(paste0(getwd(), "/RC_SET_Data_Master_updated.csv"), stringsAsFactors = F, strip.white = T) %>% 
-  mutate(Date = mdy(Date)) %>% 
+read_xlsx(paste0(getwd(), "/Data/RC_Shoreline_SET_Elevation_MSC.xlsx"), sheet = "SET Elev") %>% 
+  mutate(Date = ymd(Date)) %>% 
   rename(SET = SetNumber, Elev = SurfaceElevation.mNAVD88) %>% 
   left_join(SETids) %>% 
-  select(names(SETids), everything(), -"SasDate") %>% 
+  select(names(SETids), everything()) %>% 
   # filter(Site %in% c("PKS", "PI", "NCMM"), Marsh.Type == "Fringing", 
   #        !(SET==1&Date==ymd("2004-09-03")),
   #        !(SET==10&Date==ymd("2004-10-22"))) %>%
@@ -168,9 +167,9 @@ summary.SETs <- SET %>%
   ungroup() %>% 
   left_join(SETids) 
 
-write_csv(slopes.pins, paste0(getwd(),"/Pin Slopes.csv"))
-write_csv(slopes.arms, paste0(getwd(), "/Arm Slopes.csv"))
-write_csv(slopes.SETs, paste0(getwd(), "/SET Slopes.csv"))
+write_csv(slopes.pins, paste0(getwd(),"/Data/R Output/SETs/Pin Slopes.csv"))
+write_csv(slopes.arms, paste0(getwd(), "/Data/R Output/SETs/Arm Slopes.csv"))
+write_csv(slopes.SETs, paste0(getwd(), "/Data/R Output/SETs/SET Slopes.csv"))
 
 ggplot(summary.arms, aes(Date, m.d.Elev, color = SETArmPosition))+
   geom_line()+
