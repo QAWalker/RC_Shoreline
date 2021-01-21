@@ -27,10 +27,11 @@ spplist$quant.plotting <- c("liveStem_m2", "HMean", "snails_m2", "BMtotal")
 #create a vector of categories that we want to plot (avoids creating too many figures for uncommon categories)
 spplist$rare.plotting <- c("Bfru", "Dspi", "Hspp", "Ifru", "Jroe", "Lcar", "Malb", "Slin", "Srob", "Ssem", "Vlut", "macroalgae")
 
-# elev.raw <- read.csv(paste0(getwd(), "/RC Shoreline Elevation MASTER.csv"), na.strings = "#VALUE!")
-elev.raw.new <- read.csv(paste0(getwd(), "/RC Shoreline Elevation MASTER new.csv"), na.strings = c("#VALUE!", "-"))
+# read in raw data
+elev.raw <- read.csv(paste0(getwd(), "/Data/RC Shoreline Elevation MASTER.csv"), na.strings = c("#VALUE!", "-"))
 
-elev <- elev.raw.new %>% 
+# basic wrangling
+elev <- elev.raw %>% 
   filter(!is.na(Month)) %>% 
   mutate(Date = mdy(Date), 
          Treatment = Treatment,

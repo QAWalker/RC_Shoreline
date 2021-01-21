@@ -1,7 +1,7 @@
 #rm(list = ls())
 
 #run the data wrangling script to create our data frames for plotting
-# source("R:/CEE/RC shoreline/Data/Vegetation Data/R Analysis files/Master Veg Data Wrangling.R")
+# source(paste0(getwd(), "/RC Vegetation.R")
 
 # set universal variables for plotting ####
 # set theme for plotting 
@@ -35,10 +35,6 @@ spplist$quant.plotting <- c("liveStem_m2", "HMean", "snails_m2")
 sppabb = "Salt"
 ##### Natural vs Sill pct cover plots #####
 for (sppabb in spplist$pctcover.plotting) {#}
-  speciesname <- sppnames$sppname[sppnames$abb==sppabb]
-  commonname <- sppnames$commonname[sppnames$abb==sppabb]
-  axisname <- sppnames$axis.label[sppnames$abb==sppabb]
-  
   tempdf.summary <-
     filter(
       VegData.summary,
@@ -55,29 +51,25 @@ for (sppabb in spplist$pctcover.plotting) {#}
     scale_fill_manual(values = c("darkgray", "white"))+
     scale_y_continuous(labels = scales::percent_format(scale = 1, accuracy = 1))
   
-  if(commonname == speciesname){
+  if(commonname(sppabb) == speciesname(sppabb)){
     p <- p +
     labs(x = NULL, 
          y = expression("Mean Percent Cover "%+-%" SE"),
-         title = paste(commonname, "Percent Cover"))
+         title = paste(commonname(sppabb), "Percent Cover"))
                         
   }else{
     p <- p +
       labs(x = NULL, 
            y = expression("Mean Percent Cover "%+-%" SE"),
-           title = bquote(italic(.(speciesname))~"Percent Cover"))
+           title = bquote(italic(.(speciesname(sppabb)))~"Percent Cover"))
   }
   
   ggsave(plot = p,
-         paste0(getwd(), "/Figures/",speciesname, " Cover.png"),
+         paste0(getwd(), "/Figures/Vegetation/",speciesname(sppabb), " Cover.png"),
          width = 10, height = 3, units = "in", dpi = 330)
 }  
 ##### Natural vs Sill quantative plots #####
 for (sppabb in spplist$quant.plotting) {#}
-  speciesname <- sppnames$sppname[sppnames$abb==sppabb]
-  commonname <- sppnames$commonname[sppnames$abb==sppabb]
-  axisname <- sppnames$axis.label[sppnames$abb==sppabb]
-  
   tempdf.summary <-
     filter(
       VegData.summary,
@@ -114,15 +106,11 @@ for (sppabb in spplist$quant.plotting) {#}
   }
   
   ggsave(plot = p, 
-         paste0(getwd(), "/Figures/", speciesname, ifelse(sppabb == "HMean", " Height", " Density"), ".png"),
+         paste0(getwd(), "/Figures/Vegetation/", speciesname(sppabb), ifelse(sppabb == "HMean", " Height", " Density"), ".png"),
          width = 10, height = 3, units = "in", dpi = 330)
 }
 ##### Natural vs Sill biomass plots #####
 for (sppabb in c("BMMean", "BMtotal")) {#}
-  speciesname <- sppnames$sppname[sppnames$abb==sppabb]
-  commonname <- sppnames$commonname[sppnames$abb==sppabb]
-  axisname <- sppnames$axis.label[sppnames$abb==sppabb]
-  
   tempdf.summary <-
     filter(
       VegData.summary,
@@ -149,10 +137,10 @@ for (sppabb in c("BMMean", "BMtotal")) {#}
   }
   
   ggsave(plot = p, 
-         paste0(getwd(), "/Figures/", speciesname, ifelse(sppabb == "BMMean", " Average Biomass", " Plot Biomass"), ".png"),
+         paste0(getwd(), "/Figures/Vegetation/", speciesname(sppabb), ifelse(sppabb == "BMMean", " Average Biomass", " Plot Biomass"), ".png"),
          width = 10, height = 3, units = "in", dpi = 330)
 }
-sppabb3 = "snails_m2"
+
 ##### Natural vs Sill 3 variable comparison plots #####
 if(T){
   sppabb1 <- "Salt"
@@ -183,7 +171,7 @@ if(T){
            x = NULL)+ 
       theme(axis.title=element_text(size=10))
   
-  for (sppabb3 in c("snails_m2", "HMean", "Sspp")) {#}
+  for (sppabb3 in c("snails_m2", "HMean", "Sspp", "BMtotal")) {#}
     
     p3 <- filter(VegData.summary, Season == "Summer", Plot <= 20, variable == sppabb3) %>% 
       ggplot(aes(Date, mean, fill = Treatment))+
@@ -200,23 +188,28 @@ if(T){
                y = bquote("Mean"~.(capitalize(unitname(sppabb3)))~" "%+-%" SE"),
                x = NULL)
       }else{
+        if(sppabb == "BMtotal"){
+          p3 <- p3 + labs(title = expression(italic("Spartina alterniflora")~"Plot Biomass"), 
+                          y = expression("Mean Plot Biomass ("~g%.%m^-2~") "%+-%" SE"),
+                          x = NULL)
+        }else{
         p3 <- p3 +
           labs(subtitle = (bquote(italic(.(speciesname(sppabb3)))~.(capitalize(unitname(sppabb3))))), 
                y = bquote("Mean"~italic(.(axis.label(sppabb3)))~.(capitalize(unitname(sppabb3)))%.%m^-2%+-%" SE"),
                x = NULL)
+        }
       }
     
     ggsave(plot = ggpubr::ggarrange(p1, p2, p3, nrow = 3, common.legend = T, legend = "right", align = "v"),
-           paste0(getwd(), "/Figures/Three Variable Compliations/", 
+           paste0(getwd(), "/Figures/Vegetation/Three Variable Compliations/", 
                   paste(
                     axis.label(sppabb1), unitname(sppabb1), ",",
                     axis.label(sppabb2), unitname(sppabb2), ",",
-                    axis.label(sppabb3), unitname(sppabb3), ","),
+                    axis.label(sppabb3), unitname(sppabb3)),
                   ".png"),
            width = 10, height = 7, units = "in", dpi = 330)
   }
 }
-   
 
 ##### Natural vs Sill site comparison percent cover plots #####
 for (sppabb in spplist$pctcover.plotting) {
@@ -235,11 +228,7 @@ for (sppabb in spplist$pctcover.plotting) {
       n = length(value),
       se = ifelse(n <= 1, NA, sd / sqrt(n))) %>%
     ungroup() 
-  
-  speciesname <- sppnames$sppname[sppnames$abb==sppabb]
-  commonname <- sppnames$commonname[sppnames$abb==sppabb]
-  axisname <- sppnames$axis.label[sppnames$abb==sppabb]
-  
+
   p <- ggplot(tempdf.summary.sites, aes(Date, mean, fill = Treatment))+
     geom_line()+
     geom_errorbar(aes(min = mean - se, max = mean + se), alpha = 0.85, width = 120)+
@@ -248,21 +237,21 @@ for (sppabb in spplist$pctcover.plotting) {
     scale_fill_manual(values = c("darkgray", "white"))+
     scale_y_continuous(labels = scales::percent_format(scale = 1, accuracy = 1))
   
-  if(commonname == speciesname){
+  if(commonname(sppabb) == speciesname(sppabb)){
     p <- p +
       labs(x = NULL, 
            y = expression("Mean Percent Cover "%+-%" SE"),
-           title = paste(commonname, "Percent Cover"))
+           title = paste(commonname(sppabb), "Percent Cover"))
     
   }else{
     p <- p +
       labs(x = NULL, 
            y = expression("Mean Percent Cover "%+-%" SE"),
-           title = bquote(italic(.(speciesname))~"Percent Cover"))
+           title = bquote(italic(.(speciesname(sppabb)))~"Percent Cover"))
   }
   
   ggsave(plot = p, 
-         paste0(getwd(), "/Figures/Site Comparison/", speciesname, " Percent Cover.png"),
+         paste0(getwd(), "/Figures/Vegetation/Site Comparison/", speciesname(sppabb), " Percent Cover.png"),
          width = 10, height = 6, units = "in", dpi = 330)
 
 }
@@ -285,16 +274,13 @@ for (sppabb in spplist$quant.plotting) {#}
       se = ifelse(n <= 1, NA, sd / sqrt(n))) %>%
     ungroup() 
   
-  speciesname <- sppnames$sppname[sppnames$abb==sppabb]
-  commonname <- sppnames$commonname[sppnames$abb==sppabb]
-  axisname <- sppnames$axis.label[sppnames$abb==sppabb]
-  
-  p <- ggplot(tempdf.summary.sites, aes(Date, mean, fill = Treatment))+
-    geom_line()+
-    geom_errorbar(aes(min = mean - se, max = mean + se), alpha = 0.85, width = 120)+
-    geom_point(size = 2.5, shape = 21)+
-    facet_grid(Site~Plot, labeller = "label_both")+
-    scale_fill_manual(values = c("darkgray", "white"))
+    p <-
+      ggplot(tempdf.summary.sites, aes(Date, mean, fill = Treatment))+
+        geom_line()+
+        geom_errorbar(aes(min = mean - se, max = mean + se), alpha = 0.85, width = 120)+
+        geom_point(size = 2.5, shape = 21)+
+        facet_grid(Site~Plot, labeller = "label_both")+
+        scale_fill_manual(values = c("darkgray", "white"))
   
   if(sppabb=="HMean"){
     p <- p +
@@ -318,7 +304,7 @@ for (sppabb in spplist$quant.plotting) {#}
   }
   
   ggsave(plot = p, 
-         paste0(getwd(), "/Figures/Site Comparison/", speciesname, ifelse(sppabb == "HMean", " Height", " Density"), ".png"),
+         paste0(getwd(), "/Figures/Vegetation/Site Comparison/", speciesname(sppabb), ifelse(sppabb == "HMean", " Height", " Density"), ".png"),
          width = 10, height = 6, units = "in", dpi = 330)
 }
 
@@ -339,10 +325,6 @@ for (sppabb in c("BMMean", "BMtotal")) {#}
       n = length(value),
       se = ifelse(n <= 1, NA, sd / sqrt(n))) %>%
     ungroup() 
-  
-  speciesname <- sppnames$sppname[sppnames$abb==sppabb]
-  commonname <- sppnames$commonname[sppnames$abb==sppabb]
-  axisname <- sppnames$axis.label[sppnames$abb==sppabb]
   
   p <- ggplot(tempdf.summary.sites, aes(Date, mean, fill = Treatment))+
     geom_line()+
@@ -374,11 +356,6 @@ for (sppabb in c("BMMean", "BMtotal")) {#}
   }
   
   ggsave(plot = p, 
-         paste0(getwd(), "/Figures/Site Comparison/", speciesname, ifelse(sppabb == "BMMean", " Average Biomass", " Plot Biomass"), ".png"),
+         paste0(getwd(), "/Figures/Vegetation/Site Comparison/", speciesname(sppabb), ifelse(sppabb == "BMMean", " Average Biomass", " Plot Biomass"), ".png"),
          width = 10, height = 6, units = "in", dpi = 330)
 }
-sppabb = "BMMean"
-######################
-
-
-
