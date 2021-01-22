@@ -8,13 +8,6 @@ library(readr)
 #create color-blind pallette for plotting
 cbPalette <- c("#E69F00", "#0072B2", "#009E73", "#D55E00", "#CC79A7", "#F0E442", "#56B4E9", "#999999")
 theme_set(theme_bw() + theme(legend.key = element_rect(color = "white")))
-#run the data wrangling script to create our data frames for plotting
-source("R:/CEE/RC shoreline/Data/Vegetation Data/R Analysis files/combined wrangling.R")
-# source("R:/CEE/RC shoreline/Data/Vegetation Data/R Analysis files/Master Veg Data Wrangling.R")
-
-source("R:/CEE/RC shoreline/Data/Vegetation Data/R Analysis files/ncvs2value.R")
-source("R:/CEE/RC shoreline/Data/Vegetation Data/R Analysis files/ncvs2bb.R")
-source("R:/CEE/RC shoreline/Data/Vegetation Data/R Analysis files/bb2value.R")
 
 surveyDates <- VegData %>% 
   group_by(Year, Site, SampTime) %>% 
@@ -22,38 +15,24 @@ surveyDates <- VegData %>%
             lastsurvey = range(ymd(paste(Year, Month, Day, sep = "-")))[2]) %>% 
   ungroup()
 
-names <- names(read.csv("R:/CEE/RC shoreline/Data/Meterological Data/Beaufort Michael J Smith field.csv"))
-MetData.bft <-
-  read_csv(
-    "R:/CEE/RC shoreline/Data/Meterological Data/Beaufort Michael J Smith field.csv",
-    #col_types = rep("c", length(names)),
-    col_names = names,
-    na = c("", "-9999")
-  )[-1,]
+MetData.bft <- read_excel(paste0(getwd(), "/Data/RC_Shoreline_Environmental_MSC.xlsx"), sheet = "BFT MJS Field") %>% 
+  mutate(DATE = as.Date(DATE)) %>% 
+  select(-"STATION", -"NAME")
 
 rainfall <- MetData.bft %>% 
-  filter(ELEMENT == "PRCP") %>% 
-  melt(id.vars = c("YEAR", "MONTH", "ELEMENT")) %>% 
-  mutate(variable = as.character(variable)) %>% 
-  filter(variable != "STATION.ID") %>% 
-  mutate(DAY = as.integer(substr(variable, 6, nchar(variable))), 
-         MONTH = as.integer(MONTH),
-         YEAR = as.integer(YEAR),
-         variable = substr(variable, 1, 5),
-         DATE = ymd(paste(YEAR, MONTH, DAY, sep = "-"))) %>% #dates that do not exist return a warning
-  dplyr::select("DATE", "YEAR", "MONTH", "DAY", everything()) %>% 
-  filter(!is.na(DATE))
+  melt(id.vars = "DATE") %>% 
+  filter(variable == "PRCP") %>% 
+  mutate(YEAR = year(DATE), 
+         MONTH = month(DATE)) %>% 
+  select(DATE, YEAR, MONTH, RAIN.mm = value)
 
-rainfall.wide <- rainfall %>% 
-  dcast(DATE + YEAR + MONTH + DAY + ELEMENT ~ variable) %>% 
-  mutate(VALUE = as.numeric(VALUE) / 10) %>% 
-  dplyr::select("DATE", "YEAR", "MONTH", "DAY","RAIN.mm" = "VALUE", everything(), -"ELEMENT")
-
-rainfall.monthly <- rainfall.wide %>% 
+rainfall.monthly <- rainfall %>% 
   group_by(YEAR, MONTH) %>% 
-  summarize(RAIN.mm = sum(RAIN.mm, na.rm = T)) %>% 
+  summarise(RAIN.mm  = sum(RAIN.mm, na.rm = T)) %>% 
   ungroup()
-# write.csv(x = rainfall.monthly, "R:/CEE/RC shoreline/Data/Meterological Data/Beaufort Michael J Smith field MONTHLY.csv", row.names = F)
+
+PDSI <- read_excel(paste0(getwd(), "/Data/RC_Shoreline_Environmental_MSC.xlsx"), sheet = "PDSI") %>% 
+  mutate(DATE = as.Date(Date))
 
 drought <- read.csv("R:/CEE/RC shoreline/Data/Vegetation Data/Drought, Hurricane, and Event Data/Environmental Data.csv", stringsAsFactors = F) %>%
   mutate(Date= myd(paste0(Date, "01")))

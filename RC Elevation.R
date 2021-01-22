@@ -28,12 +28,12 @@ spplist$quant.plotting <- c("liveStem_m2", "HMean", "snails_m2", "BMtotal")
 spplist$rare.plotting <- c("Bfru", "Dspi", "Hspp", "Ifru", "Jroe", "Lcar", "Malb", "Slin", "Srob", "Ssem", "Vlut", "macroalgae")
 
 # read in raw data
-elev.raw <- read.csv(paste0(getwd(), "/Data/RC Shoreline Elevation MASTER.csv"), na.strings = c("#VALUE!", "-"))
+elev.raw <- read_xlsx(paste0(getwd(), "/Data/RC_Shoreline_Vegetation_Elevation_MSC.xlsx"), sheet = "RC Shoreline Elevation MASTER", na = c("#VALUE!", "-"))
 
 # basic wrangling
 elev <- elev.raw %>% 
   filter(!is.na(Month)) %>% 
-  mutate(Date = mdy(Date), 
+  mutate(Date = ymd(Date), 
          Treatment = Treatment,
          Feature = Feature) %>% 
   droplevels() %>% 
@@ -92,45 +92,6 @@ for (yr in unique(year(elev$intial.date))) {
     ungroup()
 }
 
-elev.summary.startyr <- list()
-plotlist <- list()
-for (yr in unique(year(elev$intial.date))) {
-  elev.summary.startyr[[as.character(yr)]] <- elev %>% 
-    filter(year(intial.date) <= yr, 
-           Date>=mdy(paste("0101", yr)),
-           Feature %in% c("Oyster", "None", "Behind")) %>% 
-    group_by(Site, Treatment, Feature, Transect, Plot) %>% 
-    arrange(Date) %>% 
-    mutate(d.Corrected = Corrected - Corrected[1]) %>% 
-    ungroup() %>% 
-    group_by(SampTime, Site, Treatment, Plot) %>% 
-    summarize(staring.year = yr, 
-              Date = mean(Date), 
-              n = sum(!is.na(Correction)), 
-              elev.mean = mean(Corrected, na.rm = T),
-              elev.sd = sd(Corrected, na.rm = T),
-              elev.se = elev.sd/sqrt(n),
-              elev.d.mean = mean(d.Corrected, na.rm = T),
-              elev.d.sd = sd(d.Corrected, na.rm = T), 
-              elev.d.se = elev.d.sd/sqrt(n)) %>% 
-    ungroup()
-  
-  plotlist[[as.character(yr)]] <- 
-    ggplot(elev.summary.startyr[[as.character(yr)]], aes(Date, y = elev.d.mean, color = paste(Treatment, Site)))+
-      geom_errorbar(aes(min = elev.d.mean - elev.d.se, max = elev.d.mean + elev.d.se), width = 90)+
-      geom_line()+
-      geom_point(size = 3)+
-      facet_wrap(Plot~., labeller = "label_both")+
-      labs(y = "Change in Elevation (m NAVD)", color = 'Treatment')
-}
-# plotlist$`2010`
-# 
-# plotlist$`2007`
-# plotlist$`2008`
-# 
-# plotlist$`2018`
-# plotlist$`2019`
-
 elev.summary.allyrs <-
   bind_rows(
     elev.summary.yr[["2007"]],
@@ -140,6 +101,9 @@ elev.summary.allyrs <-
     elev.summary.yr[["2019"]]
   )
 
+write_csv(elev.summary.allyrs, path = paste0(getwd(), "/Data/R Output/Vegetation Elevation/elev.summary.allyrs.csv"))
+
+#### Plotting ####
 ggplot(elev, aes(x = Year, y = Corrected, group = paste(Treatment, Feature, Transect, Plot), color = Treatment)) +
   geom_line() +
   geom_point() +
@@ -188,14 +152,6 @@ ggplot(elev.summary.allyrs, aes(Date, y = elev.d.mean, group = paste(initial.yea
          shape = guide_legend(override.aes = list(color = "black", size = 4, fill = "black")))
 ggsave(filename = paste0(getwd(), "/Figures/Plot Elevation/Mean Elevation change by initial year.png"),
        width = 9, height = 6, units = "in", dpi = 440)
-# for (yr in unique(year(elev$intial.date))) {
-#   ggplot(elev.summary.yr[[as.character(yr)]], aes(Date, y = elev.d.mean, color = as.factor(Treatment)))+
-#     geom_errorbar(aes(min = elev.d.mean - elev.d.se, max = elev.d.mean + elev.d.se), width = 90)+
-#     geom_line()+
-#     geom_point(size = 3)+
-#     facet_wrap(Plot~., labeller = "label_both")+
-#     labs(y = "Change in Elevation (m NAVD)", color = 'Treatment')
-# }
 
 for (S in SiteDatums$Site) {
   elev.initial[elev.initial$Site == S, "rel.elev"] = 
