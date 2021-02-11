@@ -1,4 +1,4 @@
-rm(list = ls())
+# rm(list = ls())
 
 library(tidyverse)
 library(reshape2)
@@ -9,16 +9,22 @@ library(readr)
 cbPalette <- c("#E69F00", "#0072B2", "#009E73", "#D55E00", "#CC79A7", "#F0E442", "#56B4E9", "#999999")
 theme_set(theme_bw() + theme(legend.key = element_rect(color = "white")))
 
-surveyDates <- VegData %>% 
+## create a df to store the environmental variables 
+# start with the date of the first and last survey each year
+envidata <- VegData %>% 
   group_by(Year, Site, SampTime) %>% 
   summarize(firstsurvey = range(ymd(paste(Year, Month, Day, sep = "-")))[1],
             lastsurvey = range(ymd(paste(Year, Month, Day, sep = "-")))[2]) %>% 
   ungroup()
 
+# read in the meterological data from the airport in bft
 MetData.bft <- read_excel(paste0(getwd(), "/Data/RC_Shoreline_Environmental_MSC.xlsx"), sheet = "BFT MJS Field") %>% 
-  mutate(DATE = as.Date(DATE)) %>% 
+  mutate(DATE = as.Date(DATE),
+         YEAR = year(DATE), 
+         MONTH = month(DATE)) %>% 
   select(-"STATION", -"NAME")
 
+# create a df for just the precip
 rainfall <- MetData.bft %>% 
   melt(id.vars = "DATE") %>% 
   filter(variable == "PRCP") %>% 
@@ -26,202 +32,160 @@ rainfall <- MetData.bft %>%
          MONTH = month(DATE)) %>% 
   select(DATE, YEAR, MONTH, RAIN.mm = value)
 
-rainfall.monthly <- rainfall %>% 
-  group_by(YEAR, MONTH) %>% 
-  summarise(RAIN.mm  = sum(RAIN.mm, na.rm = T)) %>% 
-  ungroup()
+#### calculate the growing season envi variables for each site and survey date ####
+## growing season (GS) = april 1st - survey date
+# total GS precipitation
+envidata$Precip.GS.mm <- sapply(X = envidata$firstsurvey, FUN = function(date){
+  sum(rainfall$RAIN.mm[rainfall$DATE >= ymd(paste(year(date), 04, 01, sep = "-")) &
+                         rainfall$DATE <= date], na.rm = T)
+})
 
+# average GS avg, min, max temperature
+for (var in c("TAVG", "TMAX", "TMIN")) {
+  envidata[,paste0(var, ".GS.C")] <- 
+    sapply(
+      X = envidata$firstsurvey, 
+      FUN = function(date){
+        temp <- MetData.bft %>% 
+          melt(id.vars = "DATE") %>% 
+          filter(variable == var,
+                 DATE >= ymd(paste(year(date), 04, 01, sep = "-")),
+                 DATE <= date)
+        
+        mean(temp$value, na.rm = T) 
+      }
+    )
+}
+
+### Read in the Palmer drought severity index data
 PDSI <- read_excel(paste0(getwd(), "/Data/RC_Shoreline_Environmental_MSC.xlsx"), sheet = "PDSI") %>% 
-  mutate(DATE = as.Date(Date))
+  mutate(Date = as.Date(Date))
 
-drought <- read.csv("R:/CEE/RC shoreline/Data/Vegetation Data/Drought, Hurricane, and Event Data/Environmental Data.csv", stringsAsFactors = F) %>%
-  mutate(Date= myd(paste0(Date, "01")))
+## Join PDSI data and survey dates by closest date
+# generate date differences between each survey date and each psdi date
+temp <- outer(envidata$firstsurvey, PDSI$Date, "-")
 
-names(drought) <- c("Date", "Month", "Year", "Precip.cm", "Temp.C", "HDDays", "CDDays", "PDSI", "PHDI", "PZI", "MPDSI", "SPI.1", "SPI.2", "SPI.3", "SPI.6")
+# remove where PDSI Date is after firstsurvey
+temp[temp < 0] <- NA
 
-drought <- full_join(drought, data.frame(Date = mdy(paste(rep(paste(1:12, 01, sep = "-"), 14), rep(2006:2019, each = 12), sep = "-")))) %>% 
-  mutate(Month = month(Date), 
-         Year = year(Date))
+# find index of minimum date difference
+ind <- apply(temp, 1, function(i) which.min(i))
 
-localPDSI <- read.csv("R:/CEE/RC shoreline/Data/Vegetation Data/Drought, Hurricane, and Event Data/PDSI from UNL Drought Atlas at MHC.csv", stringsAsFactors = F) %>% 
-  mutate(Date = as.Date(mdy_hms(Date)),
-         PDSI.MHC = PDSI)
+# match index of minimum to the Survey Dates
+envidata <- cbind(envidata,  PDSI[ind,"PDSI"]) 
 
-drought <- left_join(drought, select(localPDSI, "Date", "PDSI.MHC"), by = "Date")
-
-KBDI <- read.csv("R:/CEE/RC shoreline/Data/Vegetation Data/Drought, Hurricane, and Event Data/KBDI time series.csv", stringsAsFactors = F) %>% 
-  mutate(Date = ymd(Date))
-
-drought <- left_join(drought, KBDI, by = "Date")
-
-localSPI <- read.csv("R:/CEE/RC shoreline/Data/Vegetation Data/Drought, Hurricane, and Event Data/SPI local from Drought Atlas UNL.csv", stringsAsFactors = F) %>% 
-  mutate(Date = mdy(Date))
-
-drought <- left_join(drought, localSPI, by = "Date")
-
-localSPI.NCCD <- read.csv("R:/CEE/RC shoreline/Data/Vegetation Data/Drought, Hurricane, and Event Data/local SPI from nc climate office.csv", stringsAsFactors = F) %>%
-  mutate(Date = mdy(Date)) %>% 
-  rename_if(startsWith(names(.), "SPI"), ~paste0(., ".NCCD"))
-
-
-drought <- left_join(drought, localSPI.NCCD, by = "Date")
-
-envidata <- list("GS" = data.frame(surveyDates), "YTD" = data.frame(surveyDates), "insta" = data.frame(surveyDates))
-
-envidata$GS$Precip.GS.mm <- sapply(X = surveyDates$firstsurvey, FUN = function(date){
-  sum(rainfall.wide$RAIN.mm[rainfall.wide$DATE >= ymd(paste(year(date), 04, 01, sep = "-")) &
-                              rainfall.wide$DATE <= date], na.rm = T)
-})
-
-envidata$YTD$Precip.YTD.mm <- sapply(X = surveyDates$firstsurvey, FUN = function(date){
-  sum(rainfall.wide$RAIN.mm[rainfall.wide$DATE >= ymd(paste(year(date), 01, 01, sep = "-")) &
-                              rainfall.wide$DATE <= date], na.rm = T)
-})
-
-for (var in c("Temp.C", "PDSI", "PHDI", "PZI", "MPDSI", "KBDI", "PDSI.MHC")) {
-  envidata$GS[,paste0(var, ".GS.mean")] <- 
-    sapply(
-      X = surveyDates$firstsurvey, 
-      FUN = function(date){
-        mean(drought[drought$Date >= ymd(paste(year(date), 04, 01, sep = "-")) &
-                       drought$Date <= date, var], na.rm = T)
-      }
-    )
-  envidata$GS[,paste0(var, ".GS.sum")] <- 
-    sapply(
-      X = surveyDates$firstsurvey, 
-      FUN = function(date){
-        sum(drought[drought$Date >= ymd(paste(year(date), 04, 01, sep = "-")) &
-                      drought$Date <= date, var], na.rm = T)
-      }
-    )
-  
-  envidata$YTD[,paste0(var, ".YTD.mean")] <- 
-    sapply(
-      X = surveyDates$firstsurvey, 
-      FUN = function(date){
-        mean(drought[drought$Date >= ymd(paste(year(date), 01, 01, sep = "-")) &
-                       drought$Date <= date, var], na.rm = T)
-      }
-    )
-  
-  envidata$YTD[,paste0(var, ".YTD.sum")] <- 
-    sapply(
-      X = surveyDates$firstsurvey, 
-      FUN = function(date){
-        sum(drought[drought$Date >= ymd(paste(year(date), 01, 01, sep = "-")) &
-                      drought$Date <= date, var], na.rm = T)
-      }
-    )
-}
-
-for(var in c(names(drought)[which(grepl(pattern = "SPI", names(drought)))], "PDSI", "PHDI", "PZI", "MPDSI", "KBDI", "PDSI.MHC")){
-  envidata$insta[, paste0(var, ".I")]  <-
-    unlist(
-      sapply(X = surveyDates$firstsurvey,
-             FUN = function(date){
-               as.numeric(drought[drought$Month == month(date) & drought$Year == year(date), var])
-             })
-    )
-}
+# clean up
+rm(temp, ind)
 
 #### inundation ####
-source("R:/CEE/QuinW/R Funs/COOPS data getter.R")
+source(paste0(getwd(), "/helper scripts/CalcDatums.R"))
+source(paste0(getwd(), "/helper scripts/inundationTime.R"))
 
 bftWL <- list()
-for (yr in 2006:2019) {
-  bftWL[[paste(yr)]] <- read.csv(paste0("R:/CEE/QuinW/BFT DUML Water levels/BFTWL ", yr,".csv"), stringsAsFactors = F) %>% 
+for (yr in 2006:2020) {
+  bftWL[[paste(yr)]] <- read.csv(paste0(getwd(), "/Data/BFT DUML Water levels/BFTWL ", yr,".csv"), stringsAsFactors = F) %>% 
     mutate(DateTime = ymd_hms(DateTime))
 }
 
-envidata$datums <- data.frame(surveyDates)
+i = 1
 startMSL = -0.1375083 
-for(i in 1:length(envidata$datums$firstsurvey)){#}
-  date <- as.character(envidata$datums$firstsurvey[i])
+for(i in 1:length(envidata$firstsurvey)) {#}
+  date <- as.character(envidata$firstsurvey[i])
   
   d <- calcDatums(filter(bftWL[[as.character(unique(year(date)))]]))
-  envidata$datums[i, names(d)] <- d
+  envidata[i, names(d)] <- d
   
-  d <- calcDatums(filter(bftWL[[as.character(unique(year(date)))]], DateTime <= date))
-  envidata$datums[i, paste0(names(d), ".YTD")] <- d
+  d <-
+    calcDatums(filter(bftWL[[as.character(unique(year(date)))]], DateTime <= date))
+  envidata[i, paste0(names(d), ".YTD")] <- d
   
-  d <- calcDatums(filter(bftWL[[as.character(unique(year(date)))]], DateTime <= date, DateTime >= mdy(paste0("04-01-", as.character(unique(year(date)))))))
-  envidata$datums[i, paste0(names(d), ".GS")] <- d
+  d <-
+    calcDatums(filter(bftWL[[as.character(unique(year(date)))]], DateTime <= date, DateTime >= mdy(paste0(
+      "04-01-", as.character(unique(year(date)))
+    ))))
+  envidata[i, paste0(names(d), ".GS")] <- d
   
-  envidata$datums[i, "t"] <- as.numeric(inundationTime(WLdf = filter(bftWL[[as.character(unique(year(date)))]], DateTime <= date),
-                                                       in.elev = min(filter(bftWL[[as.character(unique(year(date)))]], DateTime <= date)$WL)-1), units = "days")
+  envidata[i, "t"] <-
+    as.numeric(inundationTime(
+      WLdf = filter(bftWL[[as.character(unique(year(date)))]], DateTime <= date),
+      in.elev = min(filter(bftWL[[as.character(unique(year(date)))]], DateTime <= date)$WL) -
+        1
+    ), units = "days")
   
-  envidata$datums[i, "t.YTD"] <- as.numeric(ymd(date) - ymd(paste0(year(date), "0101")), units = "days")
+  envidata[i, "t.YTD"] <-
+    as.numeric(ymd(date) - ymd(paste0(year(date), "0101")), units = "days")
   
-  envidata$datums[i, "t.GS"] <- as.numeric(ymd(date) - ymd(paste0(year(date), "0401")), units = "days")
+  envidata[i, "t.GS"] <-
+    as.numeric(ymd(date) - ymd(paste0(year(date), "0401")), units = "days")
   
   for (dat in names(d)) {
-    #envidata$datums[i, paste0(dat, "_IT.mins")] <- inundationTime(WLdf = filter(bftWL[[as.character(unique(year(date)))]], DateTime <= date), 
+    #envidata[i, paste0(dat, "_IT.mins")] <- inundationTime(WLdf = filter(bftWL[[as.character(unique(year(date)))]], DateTime <= date),
     #                                                                   in.elev = as.numeric(d[dat]))
-    #envidata$datums[i, paste0(dat, "_IT.pct")] <- envidata$datums[i, paste0(dat, "_IT.mins")] / envidata$datums[i, "t"]
+    #envidata[i, paste0(dat, "_IT.pct")] <- envidata[i, paste0(dat, "_IT.mins")] / envidata[i, "t"]
     
-    #IT <- inundationTime(WLdf = filter(bftWL[[as.character(unique(year(date)))]], DateTime <= date), 
+    #IT <- inundationTime(WLdf = filter(bftWL[[as.character(unique(year(date)))]], DateTime <= date),
     #                                                              in.elev = as.numeric(d[dat]))
-    #envidata$datums[i, paste0(dat, "_IT.pct")] <- IT / envidata$datums[i, "t"]
+    #envidata[i, paste0(dat, "_IT.pct")] <- IT / envidata[i, "t"]
   }
-  envidata$datums[i, paste0("IT.pct", seq(-.5, .5, by = 0.25))] <- sapply(seq(-.5, .5, by = 0.25),
-                                                                          FUN = function(L){
-                                                                            inundationTime(WLdf = filter(bftWL[[as.character(unique(year(date)))]], DateTime <= date), in.elev = L) / envidata$datums[i, "t"]
-                                                                          }
-  )
+  envidata[i, paste0("IT.pct", seq(-.5, .5, by = 0.25))] <-
+    sapply(
+      seq(-.5, .5, by = 0.25),
+      FUN = function(L) {
+        inundationTime(WLdf = filter(bftWL[[as.character(unique(year(date)))]], DateTime <= date),
+                       in.elev = L) / envidata[i, "t"]
+      }
+    )
   
-  envidata$datums[i, paste0("GS.IT.pct", seq(-.5, .5, by = 0.25))] <- sapply(seq(-.5, .5, by = 0.25),
-                                                                             FUN = function(L){
-                                                                               inundationTime(WLdf = filter(bftWL[[as.character(unique(year(date)))]], DateTime <= date, DateTime>= mdy(paste0("0401", as.character(unique(year(date)))))), in.elev = L) / (envidata$datums[i, "t.GS"]*24*60)
-                                                                             }
-  )
-  envidata$datums[i, "startMSL_IT.pct"] <- inundationTime(WLdf = filter(bftWL[[as.character(unique(year(date)))]], DateTime <= date), 
-                                                          in.elev = startMSL) / envidata$datums[i, "t"]
-} 
+  envidata[i, paste0("GS.IT.pct", seq(-.5, .5, by = 0.25))] <-
+    sapply(
+      seq(-.5, .5, by = 0.25),
+      FUN = function(L) {
+        inundationTime(WLdf = filter(bftWL[[as.character(unique(year(date)))]], DateTime <= date, DateTime >= mdy(paste0(
+          "0401", as.character(unique(year(date)))
+        ))),
+        in.elev = L) / (envidata[i, "t.GS"] * 24 * 60)
+      }
+    )
+  envidata[i, "startMSL_IT.pct"] <-
+    inundationTime(WLdf = filter(bftWL[[as.character(unique(year(date)))]], DateTime <= date),
+                   in.elev = startMSL) / envidata[i, "t"]
+}
 
 #x <- lapply(names(envidata), function(n){write_csv(envidata[[n]], paste0("R:/CEE/RC shoreline/Data/Meterological Data/survey dates and environmental variables ",n,".csv"))})
 #rm(x)
-drought.melt <- melt(drought, id.vars = c("Date", "Month", "Year"))
 
-envidata$all <- full_join(envidata$GS, full_join(envidata$YTD, full_join(envidata$insta, envidata$datums)))
+write_csv(envidata, paste0(getwd(), "/Data/R output/survey dates and environmental variables all.csv"))
 
-write_csv(envidata[["all"]], paste0("R:/CEE/RC shoreline/Data/Meterological Data/survey dates and environmental variables all.csv"))
+envidata.melt <- envidata %>% 
+  melt(., id.vars = c("Year", "Site", "SampTime", "firstsurvey", "lastsurvey"))
 
-envidata.melt <- envidata$all %>% 
-  melt(., id.vars = names(surveyDates)) 
-
-#unique(envidata.melt.p$variable)
+# unique(envidata.melt$variable)
 
 envidata.melt.p <- filter(envidata.melt, 
                           Site == "PI",
                           grepl(x = SampTime, pattern = "SU"), 
-                          variable %in% c("Precip.GS.mm", "Temp.C.GS.mean", 
-                                          "KBDI.I",
-                                          "MSL.GS",
-                                          "SPI.1.NCCD.I",
-                                          "SPI.4.NCCD.I", 
-                                          "t.GS",
+                          variable %in% c("Precip.GS.mm", "TMAX.GS.C",
+                                          "TMIN.GS.C", "PDSI",
+                                          "MSL.GS", "t.GS",
                                           "GS.IT.pct0")) %>% 
   droplevels.data.frame() %>% 
   mutate(variable = as.character(variable),
          variable = factor(variable),
          variable = fct_recode(variable,
-                               "Total Precipitation (mm)"= "Precip.GS.mm",
-                               "Mean Temperature (C)" = "Temp.C.GS.mean",
-                               "Keetch-Byram Drought Index" = "KBDI.I",
-                               "1 Month Stnd. Precip. Index" = "SPI.1.NCCD.I",
-                               "4 Month Stnd. Precip. Index" = "SPI.4.NCCD.I",
+                               "Total GS Precipitation (mm)"= "Precip.GS.mm",
+                               "Mean Daily Max Temp (C)" = "TMAX.GS.C",
+                               "Mean Daily Min Temp (C)" = "TMIN.GS.C",
+                               "Palmer Drought Severity Index" = "PDSI",
                                "GS Mean Sea Level (m NAVD)" = "MSL.GS",
                                "GS Inundation at 0m NAVD (% time)" = "GS.IT.pct0",
                                "Growing season Length (days)" = "t.GS"),
          variable = fct_relevel(variable,
-                                "Total Precipitation (mm)",
-                                "Mean Temperature (C)",
+                                "Total GS Precipitation (mm)",
+                                "Mean Daily Max Temp (C)",
+                                "Mean Daily Min Temp (C)",
+                                "Palmer Drought Severity Index",
                                 "GS Mean Sea Level (m NAVD)",
                                 "GS Inundation at 0m NAVD (% time)",
-                                "Keetch-Byram Drought Index",
-                                "1 Month Stnd. Precip. Index",
-                                "4 Month Stnd. Precip. Index",
                                 "Growing season Length (days)"))
 # variable = fct_recode(variable,
 #                       "Annual" = "Annual Mean Sea Level (m NAVD)" ,
@@ -256,21 +220,21 @@ ggplot(filter(envidata.melt.p, grepl(x = SampTime, pattern = "SU")), aes(firstsu
        subtitle = "Measured April 1 - Survey Date at Pivers Island")
 
 ggsave(
-  filename = paste0("R:/CEE/RC shoreline/VEG 2020 msc/Figures/PI Environmental data.png"),
+  filename = paste0(getwd(), "/Figures/Environmental/PI Environmental data.png"),
   width = 10,
   height = 6,
   units = "in",
   dpi = 300
 )
 
-rsq <- filter(envidata$all, grepl(x = SampTime, pattern = "SU")) %>% 
+rsq <- filter(envidata, grepl(x = SampTime, pattern = "SU")) %>% 
   summarize(m = round(summary(lm(Precip.GS.mm ~ t.GS))$coefficients[2], 3),
             b = round(summary(lm(Precip.GS.mm ~ t.GS))$coefficients[1], 2),
             r2 = round(summary(lm(Precip.GS.mm ~ t.GS))$r.squared, 3)) %>% 
   ungroup() %>% 
   mutate(sig = (r2)>0.2)
 
-ggplot(filter(envidata$all, Site %in% c('PI', 'PKS', 'NCMM'), grepl(x = SampTime, pattern = "SU")), aes(t.GS, Precip.GS.mm))+
+ggplot(filter(envidata, Site %in% c('PI', 'PKS', 'NCMM'), grepl(x = SampTime, pattern = "SU")), aes(t.GS, Precip.GS.mm))+
   geom_smooth(method = "lm", se = F, color = "black")+
   geom_point(aes(color = as.factor(Year), shape = Site), size = 3)+
   geom_text(data = rsq, aes(x = 90, y = 550, label = paste0("~r^2 ==", r2)), 
@@ -279,12 +243,12 @@ ggplot(filter(envidata$all, Site %in% c('PI', 'PKS', 'NCMM'), grepl(x = SampTime
        y = "Growing Season Total Precipitation (mm)", 
        color = "Year", 
        title = "Growing Season Length and Total Precipitation")
-ggsave(filename = paste0("R:/CEE/RC shoreline/Data/Vegetation Data/Graphs/Growing Season Length and Precip.png"),
+ggsave(filename = paste0(getwd(), "/Figures/Environmental/Growing Season Length and Precip.png"),
        width = 9, height = 6, units = "in", dpi = 300)
 
 #### clean up the global environment ####
-rm(d, KBDI, localPDSI, localSPI, localSPI.NCCD, masterVegData.summary.trt, masterVegData.summary.trt.ftr, masterVegData.summary.trt.ftr.envi)
-rm(surveyDates, VegData, VegData.melt, VegData.summary, VegData.summary.trt, VegData.summary.trt.ftr, VegData0607, VegData0607.melt, VegData0607.summary, VegData0607.summary.trt, VegData0607.summary.trt.ftr)
+rm(d)
+rm(surveyDates, VegData.summary.trt, VegData.summary.trt.ftr, VegData0607, VegData0607.melt, VegData0607.summary, VegData0607.summary.trt, VegData0607.summary.trt.ftr)
 rm(comCols, ct, dat, date, i, names, nms, PctCoverColNums, QuantColNums, run, SppColNums, startMSL, var, yr)
 
 ####Veg Data comparison with Environmental data####
@@ -294,69 +258,8 @@ envidata.summary <- envidata.melt.p %>%
   summarise(value = mean(value, na.rm = F)) %>% 
   ungroup() 
 
-masterVegData.summary.site <- VegData.melt %>% 
-  # select(-'variable.sppname', -'variable.commonname', -'variable.axislabel', -"Transect_f") %>% 
-  filter(!(Feature %in% c("Adjacent", "Eroded")), 
-         Site %in% c("NCMM", 'PKS', 'PI')) %>% 
-  group_by(Treatment, Season, variable, Year, SampTime, Plot) %>% 
-  summarize(Date = mean(Date, na.rm = T),
-            mean = mean(value, na.rm = T), 
-            sd = sd(value, na.rm = T), 
-            n = n_distinct(value, na.rm = T), 
-            se = NA) %>% 
-  ungroup() %>% 
-  rename(variable.veg = variable) %>% 
-  mutate(se = ifelse(n == 1, NA, sd / sqrt(n))) %>% 
-  left_join(envidata.summary) %>% 
-  filter(grepl(x = SampTime, pattern = "SU"))
-#variable %in% c("Precip.GS.mm",
-#"Temp.C.GS.mean",
-#"PDSI.GS.mean", "PDSI.I", "PDSI.MHC.GS.mean", "PDSI.MHC.I",
-#"KBDI.GS.mean", "KBDI.I",
-#"MSL", "MSL.YTD", "MSL.GS",
-#"SPI.1.I", "SPI.6.I",
-#"SPI.1.NCCD.I", "SPI.6.NCCD.I",
-#"SPI.1.MHC.I", "SPI.6.MHC.I") %>%
-# mutate(variable = as.character(variable),
-#        variable = factor(variable),
-#        # variable = fct_recode(variable,
-#        #                       "Total Precipitation (mm)"= "Precip.GS.mm",
-#        #                       "Mean Temperature (C)" = "Temp.C.GS.mean",
-#        #                       "Mean Palmer Drought Severity Index" = "PDSI.GS.mean",
-#        #                       "Instant Palmer Drought Severity Index" = "PDSI.I",
-#        #                       "Mean Local Palmer Drought Severity Index" = "PDSI.MHC.GS.mean",
-#        #                       "Instant Local Palmer Drought Severity Index" = "PDSI.MHC.I",
-#        #                       "Mean Keetch-Byram Drought Index" = "KBDI.GS.mean",
-#        #                       "Instant Keetch-Byram Drought Index" = "KBDI.I",
-#        #                       "1 Month Precipitation Index" = "SPI.1.I",
-#        #                       "6 Month Precipitation Index" = "SPI.6.I",
-#        #                       "1 Month Local Precipitation Index" = "SPI.1.MHC.I",
-#        #                       "6 Month Local Precipitation Index" = "SPI.6.MHC.I",
-#        #                       "1 Month Grid Precipitation Index" = "SPI.1.NCCD.I",
-#        #                       "6 Month Grid Precipitation Index" = "SPI.6.NCCD.I",
-#        #                       "GS Mean Sea Level (m NAVD)" = "MSL.GS",
-#        #                       "Annual Mean Sea Level (m NAVD)" = "MSL",
-#        #                       "YTD Mean Sea Level (m NAVD)" = "MSL.YTD"),
-#        variable = fct_relevel(variable,
-#                               "Total Precipitation (mm)",
-#                               "Mean Temperature (C)",
-#                               "Mean Palmer Drought Severity Index",
-#                               "Instant Palmer Drought Severity Index",
-#                               "Mean Local Palmer Drought Severity Index",
-#                               "Instant Local Palmer Drought Severity Index",
-#                               "Mean Keetch-Byram Drought Index",
-#                               "Instant Keetch-Byram Drought Index",
-#                               "1 Month Precipitation Index",
-#                               "6 Month Precipitation Index",
-#                               "1 Month Local Precipitation Index",
-#                               "6 Month Local Precipitation Index",
-#                               "1 Month Grid Precipitation Index",
-#                               "6 Month Grid Precipitation Index",
-#                               "Annual Mean Sea Level (m NAVD)",
-#                               "GS Mean Sea Level (m NAVD)",
-#                               "YTD Mean Sea Level (m NAVD)"))
-
-levels(masterVegData.summary.site$variable)
+VegData.envidata.summary <- VegData.summary %>% 
+  left_join(envidata.summary, by = c("SampTime"),  suffix = c(".veg", ".envi"))
 
 if(!exists("spplist")) {
   spplist <- list()
@@ -366,41 +269,80 @@ if(!exists("spplist")) {
   }
 }
 #create a vector of categories that we want to plot (avoids creating too many figures for uncommon categories)
-spplist$pctcover.plotting <- c("Salt", "Spat", "Sspp", "oyster_live", "oyster_culch", "wrack", "mussel")
+spplist$pctcover.plotting <- c("Salt", "Spat", "Sspp", "oyster_live", "oyster_culch", "mussel")
 #create a vector of categories that we want to plot (avoids creating too many figures for uncommon categories)
-spplist$quant.plotting <- c("liveStem_m2", "HMean", "snails_m2")
+spplist$quant.plotting <- c("liveStem_m2", "HMean", "snails_m2", "BMtotal")
+#create a vector of categories that we want to plot (avoids creating too many figures for uncommon categories)
+spplist$rare.plotting <- c("Bfru", "Dspi", "Hspp", "Ifru", "Jroe", "Lcar", "Malb", "Slin", "Srob", "Ssem", "Vlut", "macroalgae")#### Rsquared Table ####
 
-tempdf <- filter(masterVegData.summary.site,
+tempdf <- filter(VegData.envidata.summary,
                  grepl(x = SampTime, pattern = "SU"),
                  Plot <= 20, 
                  #Site == "PI",
                  variable.veg == "liveStem_m2",
-                 variable == "Growing season Length (days)") %>% 
+                 variable.envi == "Growing season Length (days)") %>% 
+  droplevels.data.frame()
+
+rsq.all <- VegData.envidata.summary %>% 
+  filter(Plot<=20,
+         !is.na(variable.envi),
+         variable.veg %in% c(spplist$quant.plotting, "Salt")) %>% 
+  group_by(Plot, Treatment, variable.veg, variable.envi) %>% 
+  summarize(m = round(summary(lm(mean ~ value))$coefficients[2], 3),
+            #b = round(summary(lm(mean ~ value))$coefficients[1], 2),
+            r2 = round(summary(lm(mean ~ value))$r.squared, 3)) %>% 
+  ungroup() %>% 
+  mutate(sig = (r2)>0.2) 
+
+
+for (i in 1:length(rsq.all$variable.veg)) {
+  rsq.all$variable.veg.name[i] <- paste(axis.label(as.character(rsq.all$variable.veg[i])), unitname(as.character(rsq.all$variable.veg[i])))
+}
+
+ggplot(rsq.all, aes(variable.veg.name, variable.envi))+
+  geom_text(aes(label = paste0(signif(round(r2, 2), 2), " (", ifelse(sign(m)==-1, "-", "+"), ")"), color = sig), show.legend = F)+
+  facet_grid(Plot~Treatment)+
+  scale_color_manual(values = c("black", 'red'))+
+  theme(panel.grid = element_blank(), 
+        axis.text.x = element_text(angle = 45/2, hjust = 1))+
+  labs(x = NULL, y = NULL)
+
+ggsave(filename = paste0(getwd(), "/Figures/Environmental/All Environmental Data Rsq Table .png"),
+       width = 16, height = 9, units = "in", dpi = 300)
+
+############
+
+tempdf <- filter(VegData.envidata.summary,
+                 grepl(x = SampTime, pattern = "SU"),
+                 Plot <= 20, 
+                 #Site == "PI",
+                 variable.veg == "liveStem_m2",
+                 variable.envi == "Growing season Length (days)") %>% 
   droplevels.data.frame()
 
 rsq <- tempdf %>% 
-  group_by(Plot) %>% 
+  group_by(Plot, Treatment) %>% 
   summarize(m = round(summary(lm(mean ~ value))$coefficients[2], 3),
             b = round(summary(lm(mean ~ value))$coefficients[1], 2),
             r2 = round(summary(lm(mean ~ value))$r.squared, 3),
             x = min(value, na.rm = T),
-            y = max(mean, na.rm = T)) %>% 
+            y = mean(mean, na.rm = T)) %>% 
   ungroup() %>% 
   mutate(sig = (r2)>0.2)
 
 ggplot(tempdf,
-       aes(value, mean, color = as.factor(Year)))+
-  geom_smooth(method = "lm", se = F, color = "black")+
-  geom_point(aes(shape = Treatment), size = 3)+
+       aes(value, mean, color = Treatment, group = Treatment))+
+  geom_smooth(method = "lm", se = F)+
+  geom_point(aes(fill = as.factor(Year), shape = Treatment), size = 3, color = "transparent")+
   facet_wrap(~Plot, scales = "free")+
   geom_text(data = rsq, aes(x = x, y = y, label = paste0("~r^2 ==", r2)), 
-            color = "black", size = 4.5, parse = T, hjust = 0, vjust = 1, show.legend = F)+
+            size = 4.5, parse = T, hjust = 0, vjust = 1, show.legend = F)+
   # scale_color_manual(values = c(dichromat::colorschemes$Categorical.12, (gray.colors(3)[2:1])))+
-  labs(title = "Growing Season length and S. alterniflora Density",
-       color = "Year", 
+  scale_shape_manual(values = c(21, 24))+
+  labs(title = "Growing Season length and S. alterniflora Density", 
        y = "Mean Stem Density",
        x = "Growing Season Duration (days)")
-# ggsave(filename = paste0("R:/CEE/RC shoreline/Data/Vegetation Data/Graphs/Growing Season Length and S. alt density.png"),
+# ggsave(filename = paste0(getwd(), "/Figures/Environmental/Growing Season Length and S. alt density.png"),
 #        width = 9, height = 6, units = "in", dpi = 300)
 
 tempdf <- filter(masterVegData.summary.site,
@@ -436,10 +378,10 @@ ggplot(tempdf, aes(value, mean, color = as.factor(Year)))+
        x = "Growing Season Duration (days)", 
        title = "Growing Season Length and S. alterniflora Height",
        color = "Year")
-# ggsave(filename = paste0("R:/CEE/RC shoreline/Data/Vegetation Data/Graphs/Growing Season Length and S. alt height.png"),
-#        width = 9, height = 6, units = "in", dpi = 300)
+ggsave(filename = paste0(getwd(), "/Figures/Environmental/Growing Season Length and S. alt height.png"),
+       width = 9, height = 6, units = "in", dpi = 300)
 
-levels(masterVegData.summary.trt.ftr.envi$variable)[grep(x = levels(masterVegData.summary.trt.ftr.envi$variable), pattern = "SPI")]
+
 spp = "Salt"
 for (spp in spplist$pctcover.plotting) {#}
   envidata.melt.p <- filter(envidata.melt, 

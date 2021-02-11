@@ -101,7 +101,7 @@ elev.summary.allyrs <-
     elev.summary.yr[["2019"]]
   )
 
-write_csv(elev.summary.allyrs, path = paste0(getwd(), "/Data/R Output/Vegetation Elevation/elev.summary.allyrs.csv"))
+# write_csv(elev.summary.allyrs, path = paste0(getwd(), "/Data/R Output/Vegetation Elevation/elev.summary.allyrs.csv"))
 
 #### Plotting ####
 ggplot(elev, aes(x = Year, y = Corrected, group = paste(Treatment, Feature, Transect, Plot), color = Treatment)) +
